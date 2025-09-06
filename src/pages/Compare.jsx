@@ -116,23 +116,23 @@ export default function Compare(){
           <h3 style={{ color: '#2c3e50', marginBottom: '16px' }}>AI Vegetation Analysis</h3>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-            {/* <div style={{ backgroundColor: '#e8f5e8', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ backgroundColor: '#e8f5e8', padding: '12px', borderRadius: '8px' }}>
               <h4 style={{ color: '#27ae60', margin: '0 0 8px 0' }}>Vegetation Scores</h4>
-                    <p style={{ margin: '4px 0' }}>Before: <strong>{analysis.vegetation_score_image1.toFixed(1)}%</strong></p>
-                <p style={{ margin: '4px 0' }}>After: <strong>{analysis.vegetation_score_image2.toFixed(1)}%</strong></p>
+                    <p style={{ margin: '4px 0' }}>Before: <strong>{(analysis.vegetation_score_image1*100).toFixed(1)}%</strong></p>
+                <p style={{ margin: '4px 0' }}>After: <strong>{(analysis.vegetation_score_image2*100).toFixed(1)}%</strong></p>
                 <p style={{ margin: '4px 0', color: analysis.vegetation_loss > 20 ? '#e74c3c' : '#f39c12' }}>
                   Loss: <strong>{analysis.vegetation_loss.toFixed(1)}%</strong>
                 </p>
 
-            </div> */}
+            </div>
             
-            {/* <div style={{ backgroundColor: '#f0f8ff', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ backgroundColor: '#f0f8ff', padding: '12px', borderRadius: '8px' }}>
               <h4 style={{ color: '#3498db', margin: '0 0 8px 0' }}>Analysis Confidence</h4>
-              <p style={{ margin: '4px 0' }}>Confidence: <strong>{analysis.confidence_score.toFixed(1)}%</strong></p>
+              <p style={{ margin: '4px 0' }}>Confidence: <strong>{(analysis.confidence_score*100).toFixed(1)}%</strong></p>
               <div style={{ width: '100%', backgroundColor: '#ecf0f1', borderRadius: '4px', height: '8px', marginTop: '8px' }}>
                 <div style={{ width: `${analysis.confidence_score * 100}%`, backgroundColor: '#3498db', height: '100%', borderRadius: '4px' }}></div>
               </div>
-            </div> */}
+            </div>
           </div>
 
           <div style={{ marginBottom: '20px' }}>

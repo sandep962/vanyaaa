@@ -5,13 +5,24 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const GeminiVegetationAnalyzer = require('./gemini-integration');
+const YOLODetector = require('./yolo-integration');
 const config = require('./config');
 
 const app = express();
 const PORT = config.PORT;
 
-// Initialize Gemini AI
+// Initialize AI services
 const geminiAnalyzer = new GeminiVegetationAnalyzer(config.GEMINI_API_KEY);
+const yoloDetector = new YOLODetector('./models/yoloE.pt');
+
+// Load YOLO model on startup
+yoloDetector.loadModel().then(loaded => {
+  if (loaded) {
+    console.log('✅ YOLO model loaded successfully');
+  } else {
+    console.log('⚠️ Using mock YOLO detection (model not found)');
+  }
+});
 
 // Middleware
 app.use(cors());
@@ -35,6 +46,33 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
+// Mock YOLO detection function (replace with actual YOLO model)
+function generateMockDetections() {
+  const possibleClasses = ['person', 'animal', 'vehicle', 'fire', 'firearm', 'tree', 'bird', 'deer'];
+  const detections = [];
+  
+  // Randomly generate 0-3 detections
+  const numDetections = Math.floor(Math.random() * 4);
+  
+  for (let i = 0; i < numDetections; i++) {
+    const className = possibleClasses[Math.floor(Math.random() * possibleClasses.length)];
+    detections.push({
+      id: `det_${Date.now()}_${i}`,
+      class: className,
+      confidence: Math.round((Math.random() * 0.3 + 0.7) * 100) / 100, // 0.7-1.0
+      bbox: {
+        x: Math.floor(Math.random() * 400),
+        y: Math.floor(Math.random() * 300),
+        width: Math.floor(Math.random() * 100 + 50),
+        height: Math.floor(Math.random() * 100 + 50)
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  return detections;
+}
+
 // Initialize SQLite database
 const db = new sqlite3.Database(config.DATABASE_PATH);
 
@@ -52,6 +90,20 @@ db.serialize(() => {
       image2_path TEXT,
       image1_url TEXT,
       image2_url TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create alerts table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      alert_id TEXT UNIQUE NOT NULL,
+      level TEXT NOT NULL,
+      message TEXT NOT NULL,
+      coordinates TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -242,6 +294,116 @@ app.get('/api/debug/images', (req, res) => {
     }
     res.json({ success: true, data: rows });
   });
+});
+
+// Live detection endpoint for YOLO model
+app.post('/api/live/detect', upload.single('image'), async (req, res) => {
+  try {
+    const { lat, lon, timestamp } = req.body;
+    const imageFile = req.file;
+    
+    if (!imageFile) {
+      return res.status(400).json({ error: 'No image provided' });
+    }
+    
+    // Run YOLO detection
+    const detections = await yoloDetector.detect(imageFile.path);
+    
+    // Analyze for anomalies
+    const anomalyAnalysis = yoloDetector.analyzeAnomalies(detections);
+    
+    // Create summary
+    const summary = yoloDetector.createSummary(detections, anomalyAnalysis);
+    summary.location = { lat: parseFloat(lat), lon: parseFloat(lon) };
+    
+    // Clean up uploaded file
+    fs.unlinkSync(imageFile.path);
+    
+    res.json({
+      success: true,
+      detections: detections,
+      summary: summary,
+      anomalies: anomalyAnalysis.anomalies,
+      alert_level: anomalyAnalysis.level
+    });
+    
+  } catch (error) {
+    console.error('Live detection error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Detection failed', 
+      details: error.message 
+    });
+  }
+});
+
+// Send alerts to rangers
+app.post('/api/alerts/send', async (req, res) => {
+  try {
+    const { alert, rangerLocation, priority } = req.body;
+    
+    // Store alert in database
+    db.run(
+      'INSERT INTO alerts (alert_id, level, message, coordinates, timestamp, status) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        alert.id,
+        alert.level,
+        alert.message,
+        JSON.stringify(alert.coordinates),
+        alert.timestamp,
+        'sent'
+      ],
+      function(err) {
+        if (err) {
+          console.error('Database error:', err);
+        }
+      }
+    );
+    
+    // Mock sending alert to rangers (replace with actual SMS/email service)
+    console.log(`🚨 ALERT SENT TO RANGERS:`);
+    console.log(`Priority: ${priority.toUpperCase()}`);
+    console.log(`Message: ${alert.message}`);
+    console.log(`Location: ${alert.coordinates.lat}, ${alert.coordinates.lon}`);
+    
+    res.json({
+      success: true,
+      message: 'Alert sent to rangers',
+      alertId: alert.id
+    });
+    
+  } catch (error) {
+    console.error('Alert sending error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to send alert', 
+      details: error.message 
+    });
+  }
+});
+
+// Get recent alerts
+app.get('/api/alerts', (req, res) => {
+  db.all(
+    'SELECT * FROM alerts ORDER BY timestamp DESC LIMIT 50',
+    (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      const alerts = rows.map(row => ({
+        id: row.alert_id,
+        level: row.level,
+        message: row.message,
+        coordinates: JSON.parse(row.coordinates),
+        timestamp: row.timestamp,
+        status: row.status
+      }));
+      
+      res.json({ success: true, data: alerts });
+    }
+  );
 });
 
 // Test Gemini API connection
