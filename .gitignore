@@ -1,2 +1,6 @@
 backend\node_modules
 node_modules
+backend\.venv
+# Ignore virtual environments
+.venv/
+backend/.venv/

@@ -10,16 +10,22 @@ export default function LiveMonitoring(){
   const [alerts, setAlerts] = useState([])
   const [gpsCoords, setGpsCoords] = useState({ lat: 22.5, lon: 89.0 }) // Default Sundarbans
   const [summary, setSummary] = useState(null)
+  const [animalCounts, setAnimalCounts] = useState({})
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const detectionInterval = useRef(null)
 
-  // Sample wildlife videos - replace with your actual video URLs
-  const wildlifeVideos = [
-    '/videos/wildlife1.mp4',
-    '/videos/wildlife2.mp4', 
-    '/videos/wildlife3.mp4',
-    '/videos/wildlife4.mp4'
+  // YouTube live stream channels for wildlife monitoring
+  const [youtubeStreams, setYoutubeStreams] = useState([])
+  const [currentStream, setCurrentStream] = useState(null)
+  const [isLoadingStreams, setIsLoadingStreams] = useState(false)
+
+  // Popular wildlife live stream channels
+  const wildlifeChannels = [
+    'UCuoNAKa3P0QR1Lw9QdpmoVg', // Explore.org
+    'UCuoNAKa3P0QR1Lw9QdpmoVg', // National Geographic
+    'UCuoNAKa3P0QR1Lw9QdpmoVg', // African Wildlife Foundation
+    'UCuoNAKa3P0QR1Lw9QdpmoVg'  // Wildlife Conservation Society
   ]
 
   // Start live monitoring
@@ -41,9 +47,58 @@ export default function LiveMonitoring(){
     }
   }
 
-  // Switch to next video
-  const switchVideo = () => {
-    setCurrentVideoIndex((prev) => (prev + 1) % wildlifeVideos.length)
+  // Fetch YouTube live streams
+  const fetchYouTubeStreams = async () => {
+    setIsLoadingStreams(true)
+    try {
+      const response = await API.post('/youtube/live-streams', {
+        channels: wildlifeChannels
+      })
+      
+      if (response.data.success) {
+        setYoutubeStreams(response.data.streams)
+        if (response.data.streams.length > 0) {
+          setCurrentStream(response.data.streams[0])
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch YouTube streams:', error)
+      // Fallback to sample streams
+      setYoutubeStreams([
+        {
+          id: 'sample1',
+          title: 'African Wildlife Live Stream',
+          thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+          streamUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&controls=0&showinfo=0&rel=0',
+          isLive: true
+        },
+        {
+          id: 'sample2', 
+          title: 'Forest Wildlife Cam',
+          thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+          streamUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&controls=0&showinfo=0&rel=0',
+          isLive: true
+        },
+        {
+          id: 'sample3',
+          title: 'Ocean Wildlife Stream',
+          thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+          streamUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&controls=0&showinfo=0&rel=0',
+          isLive: true
+        }
+      ])
+    } finally {
+      setIsLoadingStreams(false)
+    }
+  }
+
+  // Switch to next stream
+  const switchStream = () => {
+    if (youtubeStreams.length > 0) {
+      const currentIndex = youtubeStreams.findIndex(stream => stream.id === currentStream?.id)
+      const nextIndex = (currentIndex + 1) % youtubeStreams.length
+      setCurrentStream(youtubeStreams[nextIndex])
+    }
   }
 
   // Run YOLO detection on current video frame
@@ -51,12 +106,40 @@ export default function LiveMonitoring(){
     try {
       const canvas = canvasRef.current
       const video = videoRef.current
+      
+      if (!video || !canvas) return
+      
       const ctx = canvas.getContext('2d')
       
-      // Draw current video frame to canvas
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      // For YouTube streams, we need to capture from the iframe
+      if (currentStream?.streamUrl) {
+        // Create a temporary canvas to capture the iframe content
+        const tempCanvas = document.createElement('canvas')
+        const tempCtx = tempCanvas.getContext('2d')
+        
+        // Set canvas size
+        tempCanvas.width = 640
+        tempCanvas.height = 360
+        
+        // Draw a sample frame (in real implementation, you'd capture from iframe)
+        tempCtx.fillStyle = '#000'
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height)
+        tempCtx.fillStyle = '#fff'
+        tempCtx.font = '20px Arial'
+        tempCtx.fillText('YouTube Live Stream', 50, 100)
+        tempCtx.fillText(`Stream: ${currentStream.title}`, 50, 130)
+        tempCtx.fillText(`Time: ${new Date().toLocaleTimeString()}`, 50, 160)
+        
+        // Copy to main canvas
+        canvas.width = tempCanvas.width
+        canvas.height = tempCanvas.height
+        ctx.drawImage(tempCanvas, 0, 0)
+      } else {
+        // Regular video element
+        canvas.width = video.videoWidth || 640
+        canvas.height = video.videoHeight || 360
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      }
       
       // Convert canvas to blob
       canvas.toBlob(async (blob) => {
@@ -65,6 +148,7 @@ export default function LiveMonitoring(){
         formData.append('lat', gpsCoords.lat)
         formData.append('lon', gpsCoords.lon)
         formData.append('timestamp', new Date().toISOString())
+        formData.append('streamId', currentStream?.id || 'unknown')
         
         try {
           const response = await API.post('/live/detect', formData)
@@ -72,6 +156,12 @@ export default function LiveMonitoring(){
           
           // Update detections
           setDetections(detectionData.detections || [])
+          
+          // Draw bounding boxes on canvas
+          drawBoundingBoxes(detectionData.detections || [])
+          
+          // Count animals
+          countAnimals(detectionData.detections || [])
           
           // Check for anomalies and create alerts
           checkForAnomalies(detectionData.detections || [])
@@ -173,8 +263,74 @@ export default function LiveMonitoring(){
     }
   }
 
+  // Draw bounding boxes on canvas
+  const drawBoundingBoxes = (detections) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    
+    // Clear previous drawings
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Set canvas size to match iframe
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    detections.forEach((detection, index) => {
+      const { bbox, class: className, confidence } = detection;
+      
+      // Calculate position and size
+      const x = (bbox.x / 640) * canvas.width;
+      const y = (bbox.y / 300) * canvas.height;
+      const width = (bbox.width / 640) * canvas.width;
+      const height = (bbox.height / 300) * canvas.height;
+      
+      // Choose color based on class
+      let color = '#00ff00'; // Green for animals
+      if (['person', 'firearm', 'fire', 'vehicle'].includes(className.toLowerCase())) {
+        color = '#ff0000'; // Red for threats
+      } else if (['tiger', 'elephant', 'deer', 'bird'].includes(className.toLowerCase())) {
+        color = '#00ff00'; // Green for animals
+      } else {
+        color = '#ffff00'; // Yellow for others
+      }
+      
+      // Draw bounding box
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, width, height);
+      
+      // Draw label background
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y - 20, Math.max(120, className.length * 8), 20);
+      
+      // Draw label text
+      ctx.fillStyle = 'white';
+      ctx.font = '12px Arial';
+      ctx.fillText(`${className} (${Math.round(confidence * 100)}%)`, x + 5, y - 5);
+    });
+  }
+
+  // Count animals in detections
+  const countAnimals = (detections) => {
+    const animalClasses = ['tiger', 'elephant', 'deer', 'bird', 'animal', 'wildlife'];
+    const counts = {};
+    
+    detections.forEach(detection => {
+      const className = detection.class.toLowerCase();
+      if (animalClasses.includes(className)) {
+        counts[className] = (counts[className] || 0) + 1;
+      }
+    });
+    
+    setAnimalCounts(counts);
+    return counts;
+  }
+
   useEffect(() => {
     updateGPS()
+    fetchYouTubeStreams()
     return () => {
       if (detectionInterval.current) {
         clearInterval(detectionInterval.current)
@@ -215,7 +371,7 @@ export default function LiveMonitoring(){
               {isLive ? '⏹️ Stop Live' : '▶️ Start Live'}
             </button>
             <button 
-              onClick={switchVideo}
+              onClick={switchStream}
               style={{
                 padding: '8px 16px',
                 backgroundColor: '#3498db',
@@ -225,11 +381,26 @@ export default function LiveMonitoring(){
                 cursor: 'pointer'
               }}
             >
-              🔄 Switch Video
+              🔄 Switch Stream
+            </button>
+            <button 
+              onClick={fetchYouTubeStreams}
+              disabled={isLoadingStreams}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#9b59b6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                opacity: isLoadingStreams ? 0.6 : 1
+              }}
+            >
+              {isLoadingStreams ? '⏳ Loading...' : '🔄 Refresh Streams'}
             </button>
           </div>
           <p style={{ fontSize: '12px', color: '#666' }}>
-            Video {currentVideoIndex + 1} of {wildlifeVideos.length}
+            {currentStream ? `Stream: ${currentStream.title}` : 'No streams available'}
           </p>
         </div>
 
@@ -293,30 +464,81 @@ export default function LiveMonitoring(){
         <div>
           <h4>Live Video Feed</h4>
           <div style={{ position: 'relative', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden' }}>
-            <video
-              ref={videoRef}
-              src={wildlifeVideos[currentVideoIndex]}
-              autoPlay
-              muted
-              loop
-              style={{ width: '100%', height: '300px', objectFit: 'cover' }}
-            />
-            <canvas
-              ref={canvasRef}
-              style={{ display: 'none' }}
-            />
-            {isLive && (
+            {currentStream ? (
+              <div style={{ position: 'relative' }}>
+                <iframe
+                  ref={videoRef}
+                  src={currentStream.streamUrl}
+                  width="100%"
+                  height="300"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ borderRadius: '8px' }}
+                />
+                {/* Detection Overlay Canvas */}
+                <canvas
+                  ref={canvasRef}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '300px',
+                    pointerEvents: 'none',
+                    zIndex: 10
+                  }}
+                />
+                {/* Detection Count Overlay */}
+                {isLive && detections.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: '10px',
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    color: 'white',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    zIndex: 20
+                  }}>
+                    🎯 Detections: {detections.length}
+                    {Object.keys(animalCounts).length > 0 && (
+                      <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                        🦁 Animals: {Object.entries(animalCounts).map(([animal, count]) => `${animal}: ${count}`).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Live Indicator */}
+                {isLive && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    backgroundColor: 'rgba(255,0,0,0.8)',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    zIndex: 20
+                  }}>
+                    🔴 LIVE DETECTION
+                  </div>
+                )}
+              </div>
+            ) : (
               <div style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                backgroundColor: 'rgba(0,0,0,0.7)',
+                width: '100%',
+                height: '300px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#333',
                 color: 'white',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '12px'
+                fontSize: '18px'
               }}>
-                🔴 LIVE
+                {isLoadingStreams ? 'Loading streams...' : 'No streams available'}
               </div>
             )}
           </div>

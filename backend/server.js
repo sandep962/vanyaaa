@@ -5,7 +5,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const GeminiVegetationAnalyzer = require('./gemini-integration');
-const YOLODetector = require('./yolo-integration');
+const YOLODetector = require('./yolo-real-integration');
+const YouTubeLiveStreamFetcher = require('./youtube-integration');
 const config = require('./config');
 
 const app = express();
@@ -14,6 +15,7 @@ const PORT = config.PORT;
 // Initialize AI services
 const geminiAnalyzer = new GeminiVegetationAnalyzer(config.GEMINI_API_KEY);
 const yoloDetector = new YOLODetector('./models/yoloE.pt');
+const youtubeFetcher = new YouTubeLiveStreamFetcher(config.YOUTUBE_API_KEY || 'YOUR_YOUTUBE_API_KEY');
 
 // Load YOLO model on startup
 yoloDetector.loadModel().then(loaded => {
@@ -404,6 +406,64 @@ app.get('/api/alerts', (req, res) => {
       res.json({ success: true, data: alerts });
     }
   );
+});
+
+// YouTube Live Streams API
+app.post('/api/youtube/live-streams', async (req, res) => {
+  try {
+    const { channels } = req.body;
+    
+    console.log('Fetching YouTube live streams for channels:', channels);
+    
+    // Try to fetch live streams from specified channels
+    let streams = await youtubeFetcher.fetchLiveStreams(channels);
+    
+    // If no streams found or API fails, use custom video streams
+    if (!streams || streams.length === 0) {
+      console.log('No live streams found, using custom video streams');
+      streams = youtubeFetcher.getCustomVideoStreams();
+    }
+    
+    res.json({
+      success: true,
+      streams: streams,
+      count: streams.length
+    });
+    
+  } catch (error) {
+    console.error('YouTube streams error:', error);
+    // Fallback to custom video streams
+    const fallbackStreams = youtubeFetcher.getCustomVideoStreams();
+    res.json({
+      success: true,
+      streams: fallbackStreams,
+      count: fallbackStreams.length,
+      fallback: true
+    });
+  }
+});
+
+// Search for wildlife live streams
+app.get('/api/youtube/search-wildlife', async (req, res) => {
+  try {
+    console.log('Searching for wildlife live streams...');
+    
+    const streams = await youtubeFetcher.searchWildlifeStreams();
+    
+    res.json({
+      success: true,
+      streams: streams,
+      count: streams.length
+    });
+    
+  } catch (error) {
+    console.error('Wildlife streams search error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to search wildlife streams', 
+      details: error.message 
+    });
+  }
 });
 
 // Test Gemini API connection
