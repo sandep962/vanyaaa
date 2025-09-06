@@ -1,10 +1,10 @@
 // Configuration file for ForestWatch Backend
 module.exports = {
   // Gemini API Configuration
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY || 'AIzaSyDoWj24rwPpu15Kk96EQfnkYG1qJz-bsfU',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || 'AIzaSyCilEq6SgMSd9rzFNl8A0ndN2i46znZOjQ',
   
   // YouTube API Configuration
-  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY || 'AIzaSyCMcIZXDlikQtcl3tsrvNrjkjY_yxMBxXI',
+  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY || 'AIzaSyAuLELgg6NUf784rZxfZgJnEAeGPiLOugk',
   
   // Server Configuration
   PORT: process.env.PORT || 8000,

@@ -10,9 +10,9 @@ import cv2
 import numpy as np
 from pathlib import Path
 
-# Uncomment these lines when you have YOLO dependencies installed
-# from ultralytics import YOLO
-# import torch
+# YOLO dependencies installed
+from ultralytics import YOLO
+import torch
 
 def run_real_yolo_detection(image_path, model_path, confidence_threshold=0.5):
     """
@@ -44,40 +44,43 @@ def run_real_yolo_detection(image_path, model_path, confidence_threshold=0.5):
         print(f"Processing image: {image_path} with model: {model_path}", file=sys.stderr)
         print(f"Image size: {width}x{height}, Confidence threshold: {confidence_threshold}", file=sys.stderr)
         
-        # TODO: Uncomment and modify this section when you have YOLO installed
-        # Load YOLO model
-        # model = YOLO(model_path)
+        # Suppress YOLO's verbose output
+        from contextlib import redirect_stdout
+        from io import StringIO
         
-        # Run inference
-        # results = model(image_path, conf=confidence_threshold)
+        # Load YOLO model
+        model = YOLO(model_path)
+        
+        # Run inference with suppressed output
+        f = StringIO()
+        with redirect_stdout(f):
+            results = model(image_path, conf=confidence_threshold, verbose=False)
         
         # Process results
-        # detections = []
-        # for result in results:
-        #     boxes = result.boxes
-        #     if boxes is not None:
-        #         for box in boxes:
-        #             # Get bounding box coordinates
-        #             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-        #             confidence = float(box.conf[0].cpu().numpy())
-        #             class_id = int(box.cls[0].cpu().numpy())
-        #             class_name = model.names[class_id]
-        #             
-        #             detection = {
-        #                 'class': class_name,
-        #                 'confidence': round(confidence, 3),
-        #                 'bbox': {
-        #                     'x': int(x1),
-        #                     'y': int(y1),
-        #                     'width': int(x2 - x1),
-        #                     'height': int(y2 - y1)
-        #                 }
-        #             }
-        #             detections.append(detection)
-        
-        # For now, return empty results until you install YOLO
         detections = []
-        print("⚠️ YOLO not installed. Install with: pip install ultralytics", file=sys.stderr)
+        for result in results:
+            boxes = result.boxes
+            if boxes is not None:
+                for box in boxes:
+                    # Get bounding box coordinates
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    confidence = float(box.conf[0].cpu().numpy())
+                    class_id = int(box.cls[0].cpu().numpy())
+                    class_name = model.names[class_id]
+                    
+                    detection = {
+                        'class': class_name,
+                        'confidence': round(confidence, 3),
+                        'bbox': {
+                            'x': int(x1),
+                            'y': int(y1),
+                            'width': int(x2 - x1),
+                            'height': int(y2 - y1)
+                        }
+                    }
+                    detections.append(detection)
+        
+        print(f"🎯 Real YOLO detection: Found {len(detections)} objects", file=sys.stderr)
         
         return detections
         
