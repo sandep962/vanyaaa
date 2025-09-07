@@ -22,21 +22,18 @@ export default function LiveMonitoring(){
 
   // Popular wildlife live stream channels
   const wildlifeChannels = [
-    'UCuoNAKa3P0QR1Lw9QdpmoVg', // Explore.org
-    'UCuoNAKa3P0QR1Lw9QdpmoVg', // National Geographic
-    'UCuoNAKa3P0QR1Lw9QdpmoVg', // African Wildlife Foundation
-    'UCuoNAKa3P0QR1Lw9QdpmoVg'  // Wildlife Conservation Society
+     // Explore.org
+    'UCRPhYF9rd5ov7DNKj99MNIg', // National Geographic
+    'UC9X6gGKDv2yhMoofoeS7-Gg',
+    'UC9X6gGKDv2yhMoofoeS7-Gg'// African Wildlife Foundation
+    // Wildlife Conservation Society
   ]
 
   // Start live monitoring
   const startLiveMonitoring = () => {
     setIsLive(true)
-    // Start YOLO detection every 2 seconds
-    detectionInterval.current = setInterval(() => {
-      if (videoRef.current && canvasRef.current) {
-        runYOLODetection()
-      }
-    }, 2000)
+    // Frame downloading disabled - no automatic detection
+    console.log('Live monitoring started (frame downloading disabled)')
   }
 
   // Stop live monitoring
@@ -398,9 +395,26 @@ export default function LiveMonitoring(){
             >
               {isLoadingStreams ? '⏳ Loading...' : '🔄 Refresh Streams'}
             </button>
+            <button 
+              onClick={runYOLODetection}
+              disabled={!currentStream}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: currentStream ? 'pointer' : 'not-allowed',
+                opacity: currentStream ? 1 : 0.6
+              }}
+            >
+              🎯 Manual Detection
+            </button>
           </div>
           <p style={{ fontSize: '12px', color: '#666' }}>
             {currentStream ? `Stream: ${currentStream.title}` : 'No streams available'}
+            <br />
+            <span style={{ color: '#28a745' }}>✅ Frame downloading disabled - use Manual Detection button</span>
           </p>
         </div>
 
@@ -516,14 +530,14 @@ export default function LiveMonitoring(){
                     position: 'absolute',
                     top: '10px',
                     right: '10px',
-                    backgroundColor: 'rgba(255,0,0,0.8)',
+                    backgroundColor: 'rgba(0,123,255,0.8)',
                     color: 'white',
                     padding: '4px 8px',
                     borderRadius: '4px',
                     fontSize: '12px',
                     zIndex: 20
                   }}>
-                    🔴 LIVE DETECTION
+                    🔵 LIVE MONITORING (Manual)
                   </div>
                 )}
               </div>

@@ -8,7 +8,7 @@ export default function App(){
   return (
     <div style={{fontFamily:'Inter, system-ui', height:'100vh', display:'grid', gridTemplateRows:'56px 1fr'}}>
       <header style={{display:'flex',gap:16,alignItems:'center',padding:'8px 16px',borderBottom:'1px solid #eee'}}>
-        <strong>ForestWatch</strong>
+        <strong>Vanya</strong>
         <Link to="/">Map</Link>
         <Link to="/ol">OL Map</Link>
         <Link to="/compare">Compare</Link>

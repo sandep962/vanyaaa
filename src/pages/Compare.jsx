@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import API from '../api'
@@ -27,10 +26,16 @@ export default function Compare(){
         if (response.data.success) {
           setImages(response.data.data)
           
-          // Analyze vegetation with LLM
+          // Extract filenames from URLs for analysis
+          const image1Filename = response.data.data.image1_url.split('/').pop();
+          const image2Filename = response.data.data.image2_url.split('/').pop();
+          
+          console.log('Extracted filenames:', image1Filename, image2Filename);
+          
+          // Analyze vegetation with LLM - send filenames instead of URLs
           const analysisResponse = await API.post('/analyze-vegetation', {
-            image1_url: response.data.data.image1_url,
-            image2_url: response.data.data.image2_url,
+            image1_filename: image1Filename,
+            image2_filename: image2Filename,
             area: area,
             pointer_name: marker.title
           })
@@ -43,7 +48,7 @@ export default function Compare(){
         }
       } catch (err) {
         console.error('Error fetching data:', err)
-        setError('Failed to load images and analysis')
+        setError('Failed to load images and analysis: ' + (err.response?.data?.error || err.message))
       } finally {
         setLoading(false)
       }
@@ -93,7 +98,7 @@ export default function Compare(){
             style={{ width: '100%', borderRadius: '8px', border: '1px solid #ddd' }} 
             src={images.image1_url} 
             onError={(e) => {
-              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIE5vdCBGb3VuZDwvdGV4dD48L3N2Zz4='
+              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I="middle" dy=".3em">Image Not Found</text></svg>'
             }}
           />
         </div>
@@ -105,7 +110,7 @@ export default function Compare(){
             style={{ width: '100%', borderRadius: '8px', border: '1px solid #ddd' }} 
             src={images.image2_url}
             onError={(e) => {
-              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIE5vdCBGb3VuZDwvdGV4dD48L3N2Zz4='
+              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSI gaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I="middle" dy=".3em">Image Not Found</text></svg>'
             }}
           />
         </div>
@@ -118,12 +123,11 @@ export default function Compare(){
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
             <div style={{ backgroundColor: '#e8f5e8', padding: '12px', borderRadius: '8px' }}>
               <h4 style={{ color: '#27ae60', margin: '0 0 8px 0' }}>Vegetation Scores</h4>
-                    <p style={{ margin: '4px 0' }}>Before: <strong>{(analysis.vegetation_score_image1*100).toFixed(1)}%</strong></p>
-                <p style={{ margin: '4px 0' }}>After: <strong>{(analysis.vegetation_score_image2*100).toFixed(1)}%</strong></p>
-                <p style={{ margin: '4px 0', color: analysis.vegetation_loss > 20 ? '#e74c3c' : '#f39c12' }}>
-                  Loss: <strong>{analysis.vegetation_loss.toFixed(1)}%</strong>
-                </p>
-
+              <p style={{ margin: '4px 0' }}>Before: <strong>{(analysis.vegetation_score_image1*100).toFixed(1)}%</strong></p>
+              <p style={{ margin: '4px 0' }}>After: <strong>{(analysis.vegetation_score_image2*100).toFixed(1)}%</strong></p>
+              <p style={{ margin: '4px 0', color: analysis.vegetation_loss > 20 ? '#e74c3c' : '#f39c12' }}>
+                Loss: <strong>{analysis.vegetation_loss.toFixed(1)}%</strong>
+              </p>
             </div>
             
             <div style={{ backgroundColor: '#f0f8ff', padding: '12px', borderRadius: '8px' }}>
