@@ -245,18 +245,55 @@ app.post('/api/analyze-vegetation', async (req, res) => {
   const { image1_url, image2_url, area, pointer_name } = req.body;
   
   try {
-    // Extract file paths from URLs
-    const image1Path = path.join(__dirname, 'uploads', path.basename(image1_url));
-    const image2Path = path.join(__dirname, 'uploads', path.basename(image2_url));
+    // Debug log to see what we're receiving
+    console.log('Analysis request received:', { image1_url, image2_url, area, pointer_name });
     
-    // Check if files exist
-    if (!fs.existsSync(image1Path) || !fs.existsSync(image2Path)) {
-      return res.status(404).json({ 
-        error: 'Image files not found',
-        image1Path,
-        image2Path
+    // Extract file names from URLs - handle both full URLs and relative paths
+    const extractFilename = (url) => {
+      if (!url) return null;
+      
+      // If it's a full URL, extract the filename part
+      if (url.includes('/')) {
+        return url.substring(url.lastIndexOf('/') + 1);
+      }
+      
+      // If it's already just a filename, return it
+      return url;
+    };
+    
+    const image1Filename = extractFilename(image1_url);
+    const image2Filename = extractFilename(image2_url);
+    
+    if (!image1Filename || !image2Filename) {
+      return res.status(400).json({ 
+        error: 'Invalid image URLs provided',
+        received: { image1_url, image2_url }
       });
     }
+    
+    const image1Path = path.join(__dirname, 'uploads', image1Filename);
+    const image2Path = path.join(__dirname, 'uploads', image2Filename);
+    
+    // Check if files exist
+    if (!fs.existsSync(image1Path)) {
+      console.error('Image 1 not found at path:', image1Path);
+      return res.status(404).json({ 
+        error: 'Image 1 file not found',
+        path: image1Path,
+        filename: image1Filename
+      });
+    }
+    
+    if (!fs.existsSync(image2Path)) {
+      console.error('Image 2 not found at path:', image2Path);
+      return res.status(404).json({ 
+        error: 'Image 2 file not found',
+        path: image2Path,
+        filename: image2Filename
+      });
+    }
+    
+    console.log('Found images at paths:', { image1Path, image2Path });
     
     // Call Gemini API for analysis
     const analysisResult = await geminiAnalyzer.analyzeVegetation(
@@ -295,6 +332,20 @@ app.get('/api/debug/images', (req, res) => {
       return;
     }
     res.json({ success: true, data: rows });
+  });
+});
+
+// Debug endpoint to check file existence
+app.get('/api/debug/check-file/:filename', (req, res) => {
+  const { filename } = req.params;
+  const filePath = path.join(__dirname, 'uploads', filename);
+  const exists = fs.existsSync(filePath);
+  
+  res.json({
+    filename,
+    exists,
+    path: filePath,
+    filesInUploads: fs.readdirSync(path.join(__dirname, 'uploads'))
   });
 });
 

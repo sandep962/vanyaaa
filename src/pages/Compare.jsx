@@ -7,6 +7,7 @@ export default function Compare(){
   const [images, setImages] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -26,29 +27,35 @@ export default function Compare(){
         if (response.data.success) {
           setImages(response.data.data)
           
-          // Extract filenames from URLs for analysis
-          const image1Filename = response.data.data.image1_url.split('/').pop();
-          const image2Filename = response.data.data.image2_url.split('/').pop();
-          
-          console.log('Extracted filenames:', image1Filename, image2Filename);
-          
-          // Analyze vegetation with LLM - send filenames instead of URLs
-          const analysisResponse = await API.post('/analyze-vegetation', {
-            image1_filename: image1Filename,
-            image2_filename: image2Filename,
-            area: area,
-            pointer_name: marker.title
-          })
-          
-          if (analysisResponse.data.success) {
-            setAnalysis(analysisResponse.data.data)
+          // Analyze vegetation with LLM - send full URLs as backend expects
+          setAnalysisLoading(true)
+          try {
+            const analysisResponse = await API.post('/analyze-vegetation', {
+              image1_url: response.data.data.image1_url,  // Send full URL
+              image2_url: response.data.data.image2_url,  // Send full URL
+              area: area,
+              pointer_name: marker.title
+            })
+            
+            if (analysisResponse.data.success) {
+              setAnalysis(analysisResponse.data.data)
+            }
+          } catch (analysisErr) {
+            console.error('Error in analysis:', analysisErr)
+            setError('Analysis failed: ' + (analysisErr.response?.data?.error || analysisErr.message))
+          } finally {
+            setAnalysisLoading(false)
           }
         } else {
           setError('Images not found for this location')
         }
       } catch (err) {
         console.error('Error fetching data:', err)
-        setError('Failed to load images and analysis: ' + (err.response?.data?.error || err.message))
+        const errorMessage = err.response?.data?.error || 
+                           err.response?.data?.message || 
+                           err.message || 
+                           'Failed to load images and analysis'
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -110,13 +117,22 @@ export default function Compare(){
             style={{ width: '100%', borderRadius: '8px', border: '1px solid #ddd' }} 
             src={images.image2_url}
             onError={(e) => {
-              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSI gaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I="middle" dy=".3em">Image Not Found</text></svg>'
+              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I="middle" dy=".3em">Image Not Found</text></svg>'
             }}
           />
         </div>
       </div>
 
-      {analysis && (
+      {analysisLoading && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px', marginBottom: '20px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '16px', marginBottom: '12px', color: '#7f8c8d' }}>Analyzing vegetation changes...</div>
+            <div style={{ width: '30px', height: '30px', border: '3px solid #f3f3f3', borderTop: '3px solid #27ae60', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }}></div>
+          </div>
+        </div>
+      )}
+
+      {analysis && !analysisLoading && (
         <div style={{ backgroundColor: '#ffffff', border: '1px solid #ddd', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
           <h3 style={{ color: '#2c3e50', marginBottom: '16px' }}>AI Vegetation Analysis</h3>
           
@@ -126,7 +142,7 @@ export default function Compare(){
               <p style={{ margin: '4px 0' }}>Before: <strong>{(analysis.vegetation_score_image1*100).toFixed(1)}%</strong></p>
               <p style={{ margin: '4px 0' }}>After: <strong>{(analysis.vegetation_score_image2*100).toFixed(1)}%</strong></p>
               <p style={{ margin: '4px 0', color: analysis.vegetation_loss > 20 ? '#e74c3c' : '#f39c12' }}>
-                Loss: <strong>{analysis.vegetation_loss.toFixed(1)}%</strong>
+                Change: <strong>{analysis.vegetation_loss.toFixed(1)}%</strong>
               </p>
             </div>
             
@@ -152,6 +168,12 @@ export default function Compare(){
               ))}
             </ul>
           </div>
+        </div>
+      )}
+
+      {!analysis && !analysisLoading && (
+        <div style={{ padding: '20px', textAlign: 'center', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px dashed #ddd' }}>
+          <p style={{ color: '#7f8c8d' }}>No analysis data available</p>
         </div>
       )}
     </div>
